@@ -1,0 +1,79 @@
+# Secrets and machine-local configuration
+.env
+.env.*
+!.env.example
+.docker-config/
+*.pem
+*.key
+
+# Python environments and caches
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+
+# Jupyter and editor state
+.ipynb_checkpoints/
+.vscode/
+.idea/
+*.swp
+
+# Raw and generated datasets
+data/
+raw/
+datasets/
+*.csv.zst
+*.jsonl.zst
+
+# Training, export, and evaluation artifacts
+runs/
+checkpoints/
+vllm_exports/
+publication_evaluation*/
+parallelism_benchmarks*/
+analysis/input/
+analysis/generated/
+outputs/
+outputs*/
+mlruns/
+mlruns*/
+
+# Google Drive upload bundles and local release staging
+colab_drive_bundle*/
+github_upload*/
+release_*/
+repaired_*/
+
+# Model and optimizer weights
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.gguf
+*.onnx
+pytorch_model*.bin
+optimizer*.bin
+
+# Large archives and logs
+*.zip
+*.tar
+*.tar.gz
+*.log
+
+# Optional engine and external weight assets
+assets/engines/
+assets/weights/
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+desktop.ini

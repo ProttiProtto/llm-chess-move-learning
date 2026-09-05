@@ -1,0 +1,84 @@
+run:
+  output_root: /content/drive/MyDrive/colab_drive_bundle/publication_evaluation_v1
+  local_model_cache: /content/publication_model
+  copy_model_to_local_ssd: true
+  # Restore the proven LLM.generate path for quality evaluation. Serving
+  # concurrency and TTFT benchmarks are a separate follow-up stage.
+  quality_backend: offline_vllm_llm_generate
+  quality_warmup_positions: 8
+  quality_concurrency: 256
+  resume: true
+  fail_fast: false
+
+data:
+  validation_path: /content/drive/MyDrive/colab_drive_bundle/datasets/lichess_legal_v1/validation.jsonl
+  all_moves_training_path: /content/drive/MyDrive/colab_drive_bundle/datasets/lichess_legal_v1/sft_all_legal_moves_v2_max80.jsonl
+  training_paths:
+    - /content/drive/MyDrive/colab_drive_bundle/datasets/lichess_legal_v1/sft_all_legal_moves_v2_max80.jsonl
+  checkpoint_selection_positions: 128
+
+generation:
+  temperature: 0.0
+  top_p: 1.0
+  top_k: -1
+  min_p: 0.0
+  repetition_penalty: 1.0
+  seed: 20260820
+  max_output_tokens: 512
+
+server:
+  max_model_len: 1024
+  max_num_seqs: 256
+  max_num_batched_tokens: 16384
+  gpu_memory_utilization: 0.90
+  # Disable this for timing: quality evaluation runs the same prompts first.
+  enable_prefix_caching: false
+  enable_chunked_prefill: true
+  scheduling_policy: fcfs
+  enforce_eager: false
+  startup_timeout_seconds: 1200
+  nvfp4_linear_backend: flashinfer_cutlass
+  nvfp4_moe_backend: flashinfer_b12x
+
+performance:
+  enabled: false
+  modes: [natural_fen, fixed_tokens]
+  concurrencies: [1, 8, 32, 128, 256]
+  repetitions: 3
+  fixed_input_tokens: 128
+  fixed_output_tokens: 128
+  requests_per_concurrency:
+    "1": 32
+    "8": 32
+    "32": 64
+    "128": 256
+    "256": 512
+
+models:
+  - {name: 270m-base-bf16, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/270m_base/merged_bf16}
+  - {name: 270m-base-fp8, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/270m_base/fp8_dynamic}
+  - {name: 270m-base-nvfp4, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/270m_base/nvfp4}
+  - {name: 270m-r16-bf16, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/270m_r16_best/merged_bf16}
+  - {name: 270m-r16-fp8, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/270m_r16_best/fp8_dynamic}
+  - {name: 270m-r16-nvfp4, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/270m_r16_best/nvfp4}
+  - {name: 270m-r32-bf16, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/270m_r32_best/merged_bf16}
+  - {name: 270m-r32-fp8, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/270m_r32_best/fp8_dynamic}
+  - {name: 270m-r32-nvfp4, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/270m_r32_best/nvfp4}
+  - {name: e2b-base-bf16, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/e2b_base/merged_bf16}
+  - {name: e2b-base-fp8, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/e2b_base/fp8_dynamic}
+  - {name: e2b-base-nvfp4, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/e2b_base/nvfp4}
+  - {name: e2b-r16-bf16, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/e2b_r16_best/merged_bf16}
+  - {name: e2b-r16-fp8, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/e2b_r16_best/fp8_dynamic}
+  - {name: e2b-r16-nvfp4, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/e2b_r16_best/nvfp4}
+  - {name: e2b-r32-bf16, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/e2b_r32_best/merged_bf16}
+  - {name: e2b-r32-fp8, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/e2b_r32_best/fp8_dynamic}
+  - {name: e2b-r32-nvfp4, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/e2b_r32_best/nvfp4}
+  - {name: e4b-base-bf16, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/e4b_base/merged_bf16}
+  - {name: e4b-base-fp8, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/e4b_base/fp8_dynamic}
+  - {name: e4b-base-nvfp4, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/e4b_base/nvfp4}
+  - {name: e4b-r16-bf16, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/e4b_r16_best/merged_bf16}
+  - {name: e4b-r16-fp8, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/e4b_r16_best/fp8_dynamic}
+  - {name: e4b-r16-nvfp4, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/e4b_r16_best/nvfp4}
+  - {name: e4b-r32-bf16, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/e4b_r32_best/merged_bf16}
+  - {name: e4b-r32-fp8, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/e4b_r32_best/fp8_dynamic}
+  - {name: e4b-r32-nvfp4, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/e4b_r32_best/nvfp4}

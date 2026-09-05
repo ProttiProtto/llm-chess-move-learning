@@ -1,0 +1,62 @@
+run:
+  output_root: /content/drive/MyDrive/colab_drive_bundle/parallelism_benchmarks_v1
+  local_model_cache: /content/parallelism_model
+  copy_model_to_local_ssd: true
+  resume: true
+  fail_fast: false
+
+data:
+  # The notebook resolves these to the completed publication evaluation.
+  quality_comparison_path: null
+  testset_path: null
+
+generation:
+  temperature: 0.0
+  top_p: 1.0
+  top_k: -1
+  min_p: 0.0
+  repetition_penalty: 1.0
+  seed: 20260820
+  natural_max_output_tokens: 512
+
+server:
+  max_model_len: 1024
+  max_num_seqs: 256
+  max_num_batched_tokens: 16384
+  gpu_memory_utilization: 0.90
+  enable_prefix_caching: false
+  enable_chunked_prefill: true
+  scheduling_policy: fcfs
+  enforce_eager: false
+  startup_timeout_seconds: 1200
+  nvfp4_linear_backend: flashinfer_cutlass
+  nvfp4_moe_backend: flashinfer_b12x
+
+benchmark:
+  modes: [natural_fen, fixed_tokens]
+  concurrencies: [1, 8, 32, 128, 256]
+  repetitions: 3
+  warmup_requests: 16
+  fixed_input_tokens: 128
+  fixed_output_tokens: 128
+  request_rate: inf
+  requests_per_concurrency:
+    "1": 128
+    "8": 128
+    "32": 256
+    "128": 512
+    "256": 1024
+
+# Rank-32 is the deployment-quality checkpoint. Once merged, rank 16 and rank
+# 32 use the same inference architecture, so benchmarking all 27 exports would
+# mostly repeat equivalent fixed-token measurements.
+models:
+  - {name: 270m-r32-bf16, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/270m_r32_best/merged_bf16}
+  - {name: 270m-r32-fp8, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/270m_r32_best/fp8_dynamic}
+  - {name: 270m-r32-nvfp4, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/270m_r32_best/nvfp4}
+  - {name: e2b-r32-bf16, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/e2b_r32_best/merged_bf16}
+  - {name: e2b-r32-fp8, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/e2b_r32_best/fp8_dynamic}
+  - {name: e2b-r32-nvfp4, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/e2b_r32_best/nvfp4}
+  - {name: e4b-r32-bf16, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/e4b_r32_best/merged_bf16}
+  - {name: e4b-r32-fp8, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/e4b_r32_best/fp8_dynamic}
+  - {name: e4b-r32-nvfp4, path: /content/drive/MyDrive/colab_drive_bundle/vllm_exports/e4b_r32_best/nvfp4}

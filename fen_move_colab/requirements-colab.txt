@@ -1,0 +1,13 @@
+# Colab core dependencies. PyTorch is deliberately omitted: Colab provides the
+# CUDA-matched torch build, and replacing it can break GPU support.
+python-chess>=1.999
+pandas>=2.2,<3
+tqdm>=4.66,<5
+zstandard>=0.22,<1
+pyyaml>=6,<7
+datasets>=2.16,<4
+transformers>=4.45,<6
+accelerate>=0.34,<2
+peft>=0.18,<1
+sentencepiece>=0.2,<1
+protobuf>=4,<7

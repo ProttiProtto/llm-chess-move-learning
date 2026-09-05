@@ -1,0 +1,162 @@
+"""Evaluate saved SFT LoRA checkpoints after training has finished."""
+
+import argparse
+import copy
+import gc
+import re
+from pathlib import Path
+from typing import Dict, List
+
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+from .common import load_config, resolve_drive_path, save_json, set_seed
+from .fp8_lora import (
+    get_model_load_kwargs,
+    maybe_prepare_fp8_lora_model,
+    precision_mode,
+    resolve_adapter_source,
+)
+from .train_sft_chunk import (
+    AllLegalMovesValidationCallback,
+    LegalMoveValidationCallback,
+    _load_sft_validation_examples,
+)
+
+
+def _checkpoint_sort_key(path: Path):
+    match = re.fullmatch(r"checkpoint-(\d+)", path.name)
+    if match:
+        return (str(path.parent), int(match.group(1)), 0)
+    sample_step = re.fullmatch(r"step_(\d+)", path.name)
+    return (str(path), int(sample_step.group(1)) if sample_step else 10**18, 1)
+
+
+def discover_adapter_checkpoints(root: str) -> List[Path]:
+    root_path = Path(root).expanduser().resolve()
+    if not root_path.is_dir():
+        raise FileNotFoundError(f"Checkpoint root does not exist: {root_path}")
+    checkpoints = {
+        path.parent
+        for path in root_path.rglob("adapter_config.json")
+        if path.is_file()
+    }
+    if not checkpoints:
+        raise FileNotFoundError(f"No PEFT adapter checkpoints were found below {root_path}")
+    return sorted(checkpoints, key=_checkpoint_sort_key)
+
+
+def _release_cuda_memory() -> None:
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+
+def evaluate_checkpoints(
+    config: Dict,
+    checkpoint_root: str,
+    samples: int,
+    batch_size: int,
+    max_new_tokens: int,
+    output_path: str,
+) -> Dict:
+    set_seed(int(config["run"]["seed"]))
+    eval_config = copy.deepcopy(config)
+    eval_config.setdefault("performance", {})["torch_compile"] = False
+    eval_config["performance"]["gradient_checkpointing"] = False
+
+    sft_cfg = eval_config["sft"]
+    output_mode = str(sft_cfg.get("output_mode", "single_move"))
+    if output_mode not in {"single_move", "all_legal_moves"}:
+        raise ValueError("sft.output_mode must be 'single_move' or 'all_legal_moves'.")
+    examples = _load_sft_validation_examples(eval_config, samples)
+    if not examples:
+        raise ValueError("No held-out validation examples were loaded.")
+
+    checkpoints = discover_adapter_checkpoints(checkpoint_root)
+    payload = {
+        "checkpoint_root": str(Path(checkpoint_root).resolve()),
+        "output_mode": output_mode,
+        "precision_mode": precision_mode(eval_config),
+        "samples": len(examples),
+        "batch_size": batch_size,
+        "max_new_tokens": max_new_tokens,
+        "results": [],
+    }
+
+    for index, checkpoint in enumerate(checkpoints, start=1):
+        print(f"Evaluating checkpoint {index}/{len(checkpoints)}: {checkpoint}", flush=True)
+        model_source, adapter_path = resolve_adapter_source(str(checkpoint), sft_cfg["model_id"])
+        tokenizer = AutoTokenizer.from_pretrained(model_source)
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+        model = AutoModelForCausalLM.from_pretrained(model_source, **get_model_load_kwargs(eval_config))
+        model = maybe_prepare_fp8_lora_model(model, eval_config, adapter_path=adapter_path)
+        if hasattr(model, "config"):
+            model.config.use_cache = True
+
+        callback_cls = (
+            AllLegalMovesValidationCallback
+            if output_mode == "all_legal_moves"
+            else LegalMoveValidationCallback
+        )
+        evaluator = callback_cls(
+            tokenizer=tokenizer,
+            examples=examples,
+            eval_steps=1,
+            max_new_tokens=max_new_tokens,
+            batch_size=batch_size,
+        )
+        metrics = evaluator._evaluate(model)
+        result = {
+            "checkpoint": str(checkpoint),
+            "checkpoint_name": checkpoint.name,
+            **metrics,
+        }
+        payload["results"].append(result)
+        save_json(output_path, payload)
+        print(result, flush=True)
+        del evaluator, model, tokenizer
+        _release_cuda_memory()
+
+    score_key = (
+        "fen_sft_val_all_moves_f1"
+        if output_mode == "all_legal_moves"
+        else "fen_sft_val_legal_move_rate"
+    )
+    payload["selection_metric"] = score_key
+    payload["best"] = max(payload["results"], key=lambda item: item.get(score_key, float("-inf")))
+    save_json(output_path, payload)
+    print(f"Saved checkpoint evaluation report: {output_path}")
+    print(f"Best checkpoint by {score_key}: {payload['best']['checkpoint']}")
+    return payload
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Evaluate every saved SFT LoRA checkpoint.")
+    parser.add_argument("--config", required=True, help="Path to the runtime training YAML generated by the notebook.")
+    parser.add_argument("--checkpoint-root", default=None)
+    parser.add_argument("--samples", type=int, default=None)
+    parser.add_argument("--batch-size", type=int, default=None)
+    parser.add_argument("--max-new-tokens", type=int, default=None)
+    parser.add_argument("--output", default=None)
+    args = parser.parse_args()
+
+    config = load_config(args.config)
+    val_cfg = config["sft"].get("validation", {})
+    output_mode = str(config["sft"].get("output_mode", "single_move"))
+    default_samples = 128 if output_mode == "all_legal_moves" else 256
+    default_batch_size = 8 if output_mode == "all_legal_moves" else 16
+    default_max_tokens = 512 if output_mode == "all_legal_moves" else 8
+    evaluate_checkpoints(
+        config=config,
+        checkpoint_root=args.checkpoint_root or resolve_drive_path(config, "checkpoints", "sft"),
+        samples=int(args.samples or val_cfg.get("samples", default_samples)),
+        batch_size=int(args.batch_size or val_cfg.get("batch_size", default_batch_size)),
+        max_new_tokens=int(args.max_new_tokens or val_cfg.get("max_new_tokens", default_max_tokens)),
+        output_path=args.output or resolve_drive_path(config, "metrics", "sft", "checkpoint_evaluation.json"),
+    )
+
+
+if __name__ == "__main__":
+    main()

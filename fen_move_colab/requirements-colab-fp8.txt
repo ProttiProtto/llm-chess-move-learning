@@ -1,0 +1,5 @@
+# Optional FP8 and prototype NVFP4-QAT dependency.
+# TorchAO must remain compatible with the PyTorch/CUDA build supplied by the
+# runtime. TorchAO 0.17 compiled kernels require PyTorch 2.11 or newer; the
+# installer checks this and prints both versions for reproducibility.
+torchao>=0.17,<0.18
