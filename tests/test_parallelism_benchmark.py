@@ -2,6 +2,8 @@ from fen_move_colab.run_parallelism_benchmark import (
     _request_count,
     _scalar_result,
     _scenario_plan,
+    _signature_config,
+    _validate_quality_provenance,
     _validate_benchmark_result,
 )
 
@@ -60,3 +62,25 @@ def test_result_validation_rejects_partial_success():
         assert "completed 127 of 128" in str(exc)
     else:
         raise AssertionError("Expected partial benchmark result to fail validation")
+
+
+def test_parallelism_signature_ignores_transient_port():
+    first = {"server": {"port": 12345, "host": "127.0.0.1"}, "run": {"resume": True}}
+    second = {"server": {"port": 54321, "host": "127.0.0.1"}, "run": {"resume": True}}
+    assert _signature_config(first) == _signature_config(second)
+
+
+def test_quality_provenance_requires_exact_checkpoint_hash():
+    evidence = {"quality_status": "completed", "checkpoint_content_sha256": "abc"}
+    manifest = {"checkpoint_content_sha256": "abc"}
+    result = _validate_quality_provenance("demo", evidence, manifest)
+    assert result["checkpoint_hash_match"] is True
+
+    try:
+        _validate_quality_provenance(
+            "demo", evidence, {"checkpoint_content_sha256": "different"}
+        )
+    except ValueError as exc:
+        assert "Checkpoint hash mismatch" in str(exc)
+    else:
+        raise AssertionError("Expected mismatched checkpoint hashes to fail")

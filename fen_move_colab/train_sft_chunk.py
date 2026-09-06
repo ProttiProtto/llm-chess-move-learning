@@ -31,6 +31,7 @@ from .fp8_lora import (
     resolve_adapter_source,
 )
 from .jsonl_data import load_jsonl_slice
+from .publication_eval import parse_uci_moves, transformers_stop_kwargs
 from .performance import (
     configure_torch_runtime,
     gradient_checkpointing_enabled,
@@ -330,22 +331,12 @@ class AllLegalMovesValidationCallback(TrainerCallback):
         self.batch_size = max(1, int(batch_size))
         self.telemetry_callback = telemetry_callback
         self.latest_metrics: Dict[str, float] = {}
+        self.stop_config, self.stop_kwargs = transformers_stop_kwargs(tokenizer)
 
     @staticmethod
     def _prompt(example) -> str:
         instruction = make_all_legal_moves_instruction(example["fen"])
         return f"<start_of_turn>user\n{instruction}<end_of_turn>\n<start_of_turn>model\n"
-
-    @staticmethod
-    def _uci_moves_in_order(text: str) -> List[str]:
-        seen = set()
-        moves = []
-        for match in UCI_RE.finditer((text or "").lower()):
-            move = match.group(0)
-            if move not in seen:
-                seen.add(move)
-                moves.append(move)
-        return moves
 
     def _evaluate(self, model) -> Dict[str, float]:
         if not self.examples:
@@ -374,21 +365,29 @@ class AllLegalMovesValidationCallback(TrainerCallback):
                     inputs = self.tokenizer(prompts, return_tensors="pt", padding=True, truncation=True)
                     device = getattr(model, "device", None) or next(model.parameters()).device
                     inputs = {key: value.to(device) for key, value in inputs.items()}
-                    outputs = model.generate(
-                        **inputs,
-                        max_new_tokens=self.max_new_tokens,
-                        do_sample=False,
-                        pad_token_id=pad_token_id,
-                        eos_token_id=self.tokenizer.eos_token_id,
-                    )
+                    generation_kwargs = {
+                        **self.stop_kwargs,
+                        "max_new_tokens": self.max_new_tokens,
+                        "do_sample": False,
+                        "pad_token_id": pad_token_id,
+                    }
+                    try:
+                        outputs = model.generate(**inputs, **generation_kwargs)
+                    except TypeError:
+                        # Older Transformers builds may not expose string
+                        # stopping; parsing below remains the correctness
+                        # backstop, and the stop contract is still recorded.
+                        generation_kwargs.pop("stop_strings", None)
+                        generation_kwargs.pop("tokenizer", None)
+                        outputs = model.generate(**inputs, **generation_kwargs)
                     generated_ids = outputs[:, inputs["input_ids"].shape[-1]:]
-                    completions = self.tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+                    completions = self.tokenizer.batch_decode(generated_ids, skip_special_tokens=False)
 
                     for completion, example in zip(completions, batch_examples):
                         expected = sorted(set(example.get("legal_moves", [])))
                         if not expected:
                             raise ValueError("All-moves validation requires legal_moves in each validation record.")
-                        predicted = self._uci_moves_in_order(completion)
+                        predicted = parse_uci_moves(completion)["moves"]
                         predicted_set = set(predicted)
                         expected_set = set(expected)
                         correct = predicted_set & expected_set

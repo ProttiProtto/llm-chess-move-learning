@@ -39,7 +39,7 @@ from .publication_eval import (
 )
 
 
-CONTRACT_VERSION = "publication_vllm_eval_v2_offline_quality"
+CONTRACT_VERSION = "publication_vllm_eval_v3_eot_selection_provenance"
 
 
 def _percentile(values: Sequence[float], fraction: float) -> float | None:

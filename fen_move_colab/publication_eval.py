@@ -118,6 +118,23 @@ def resolve_stop_config(tokenizer, marker: str = END_OF_TURN) -> Dict:
     }
 
 
+def transformers_stop_kwargs(tokenizer, marker: str = END_OF_TURN) -> Tuple[Dict, Dict]:
+    """Return the shared stop contract and kwargs for Transformers generation.
+
+    Gemma 4 encodes the marker as multiple tokens, so string stopping is the
+    authoritative mechanism. A verified single-token ID is added only when it
+    is safe to do so; callers should still truncate decoded text with
+    ``parse_uci_moves`` as the correctness backstop.
+    """
+    stop_config = resolve_stop_config(tokenizer, marker)
+    kwargs = {
+        "stop_strings": list(stop_config["stop_strings"]),
+        "tokenizer": tokenizer,
+        "eos_token_id": stop_config["stop_token_ids"] or tokenizer.eos_token_id,
+    }
+    return stop_config, kwargs
+
+
 def parse_uci_moves(text: str, marker: str = END_OF_TURN) -> Dict:
     truncated, saw_eot, after_eot = truncate_at_end_of_turn(text, marker)
     tokens = truncated.lower().split()
@@ -331,6 +348,10 @@ def prepare_publication_split(
     output_dir: os.PathLike[str] | str,
     selection_count: int = 128,
 ) -> Dict:
+    if not training_paths:
+        raise ValueError(
+            "At least one training file is required so selection/test leakage can be audited."
+        )
     records = list(jsonl_rows(validation_path))
     if selection_count < 0 or selection_count >= len(records):
         raise ValueError(
@@ -361,6 +382,8 @@ def prepare_publication_split(
 
     training_fen_hits = set()
     training_game_hits = set()
+    training_selection_fen_hits = set()
+    training_selection_game_hits = set()
     missing_training_game_ids = 0
     checked_paths = []
     for training_path in training_paths:
@@ -374,10 +397,20 @@ def prepare_publication_split(
                 training_fen_hits.add(fen)
             if game and game in test_games:
                 training_game_hits.add(game)
+            if fen in selection_fens:
+                training_selection_fen_hits.add(fen)
+            if game and game in selection_games:
+                training_selection_game_hits.add(game)
     if training_fen_hits or training_game_hits:
         raise ValueError(
             "Training leakage detected: "
             f"{len(training_fen_hits)} FEN and {len(training_game_hits)} game collisions."
+        )
+    if training_selection_fen_hits or training_selection_game_hits:
+        raise ValueError(
+            "Training leakage detected in checkpoint-selection set: "
+            f"{len(training_selection_fen_hits)} FEN and "
+            f"{len(training_selection_game_hits)} game collisions."
         )
     if missing_training_game_ids:
         raise ValueError(
@@ -395,7 +428,7 @@ def prepare_publication_split(
     test_path = destination / f"heldout_{len(test_rows)}_{test_hash[:12]}.jsonl"
     write_jsonl(test_path, test_rows)
     manifest = {
-        "contract": "publication_split_v1",
+        "contract": "publication_split_v2",
         "source_validation_path": str(Path(validation_path).resolve()),
         "source_validation_sha256": sha256_file(validation_path),
         "source_validation_positions": len(records),
@@ -409,6 +442,10 @@ def prepare_publication_split(
         "training_paths_checked": checked_paths,
         "training_fen_collisions": 0,
         "training_game_collisions": 0,
+        "training_selection_fen_collisions": 0,
+        "training_selection_game_collisions": 0,
+        "training_files_required": True,
+        "training_files_checked_count": len(checked_paths),
         "validation_rows_missing_source_game_id": 0,
         "training_rows_missing_source_game_id": 0,
         "ground_truth_engine": f"python-chess {chess.__version__}",

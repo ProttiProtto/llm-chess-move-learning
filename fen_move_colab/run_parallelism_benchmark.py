@@ -22,10 +22,16 @@ from typing import Dict, List, Mapping, Sequence
 
 import yaml
 
-from .publication_eval import END_OF_TURN, build_all_moves_prompt, write_json, write_jsonl
+from .publication_eval import (
+    END_OF_TURN,
+    build_all_moves_prompt,
+    checkpoint_content_manifest,
+    write_json,
+    write_jsonl,
+)
 
 
-CONTRACT_VERSION = "fen_move_vllm_parallelism_v1"
+CONTRACT_VERSION = "fen_move_vllm_parallelism_v2"
 
 
 def _load_json(path: Path) -> Dict:
@@ -441,6 +447,56 @@ def _quality_evidence(comparison: Mapping) -> Dict[str, Dict]:
     return evidence
 
 
+def _validate_quality_provenance(
+    model_name: str, quality_evidence: Mapping, serving_manifest: Mapping
+) -> Dict:
+    """Require quality evidence for the exact checkpoint being benchmarked."""
+    if not quality_evidence:
+        raise ValueError(f"No quality evidence is recorded for {model_name}.")
+    if quality_evidence.get("quality_status") != "completed":
+        raise ValueError(
+            f"Quality evaluation for {model_name} is not completed: "
+            f"{quality_evidence.get('quality_status')!r}."
+        )
+    expected_hash = str(quality_evidence.get("checkpoint_content_sha256") or "")
+    actual_hash = str(serving_manifest.get("checkpoint_content_sha256") or "")
+    if not expected_hash:
+        raise ValueError(
+            f"Quality evaluation for {model_name} has no checkpoint content hash."
+        )
+    if not actual_hash:
+        raise ValueError(f"Serving checkpoint for {model_name} has no content hash.")
+    if expected_hash != actual_hash:
+        raise ValueError(
+            f"Checkpoint hash mismatch for {model_name}: quality={expected_hash}, "
+            f"serving={actual_hash}."
+        )
+    return {
+        "quality_status": quality_evidence["quality_status"],
+        "quality_checkpoint_content_sha256": expected_hash,
+        "serving_checkpoint_content_sha256": actual_hash,
+        "checkpoint_hash_match": True,
+    }
+
+
+def _signature_config(config: Mapping) -> Dict:
+    """Remove transient runtime ports before hashing a resumable run contract."""
+    payload = json.loads(json.dumps(config))
+
+    def strip_transient(value):
+        if isinstance(value, dict):
+            return {
+                key: strip_transient(item)
+                for key, item in value.items()
+                if key != "port"
+            }
+        if isinstance(value, list):
+            return [strip_transient(item) for item in value]
+        return value
+
+    return strip_transient(payload)
+
+
 def _prepare_natural_dataset(testset_path: Path, output_path: Path) -> Dict:
     records = _read_jsonl(testset_path)
     prompts = []
@@ -629,12 +685,18 @@ def evaluate_model(
     model_dir = run_dir / "models" / name
     model_dir.mkdir(parents=True, exist_ok=True)
     report_path = model_dir / "report.json"
+    serving_manifest = checkpoint_content_manifest(source_path)
+    provenance = _validate_quality_provenance(
+        name, quality_evidence.get(name), serving_manifest
+    )
     report = {
         "name": name,
         "status": "running",
         "contract": CONTRACT_VERSION,
         "source_model_path": str(source_path),
         "quality_evidence": quality_evidence.get(name),
+        "serving_checkpoint": serving_manifest,
+        "checkpoint_provenance": provenance,
         "started_utc": datetime.now(timezone.utc).isoformat(),
     }
     write_json(report_path, report)
@@ -754,7 +816,7 @@ def run(config: Mapping) -> Dict:
     testset_sha = _sha256_file(testset_path)
     signature_payload = {
         "contract": CONTRACT_VERSION,
-        "config": config_payload,
+        "config": _signature_config(config_payload),
         "testset_sha256": testset_sha,
         "quality_config_sha256": quality.get("config_sha256"),
         "quality_checkpoint_hashes": evidence,

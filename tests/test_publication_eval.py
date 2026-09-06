@@ -138,6 +138,21 @@ class PublicationEvaluationTests(unittest.TestCase):
                     validation_path, [training_path], root / "leaky", selection_count=1
                 )
 
+            _write_jsonl(training_path, [validation[0]])
+            with self.assertRaisesRegex(ValueError, "checkpoint-selection"):
+                prepare_publication_split(
+                    validation_path, [training_path], root / "selection-leaky", selection_count=1
+                )
+
+    def test_split_requires_training_files_for_a_complete_leakage_audit(self):
+        validation = [_record(START_FEN, "p0", "g0"), _record(_position_after("e2e4"), "p1", "g1")]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            validation_path = root / "validation.jsonl"
+            _write_jsonl(validation_path, validation)
+            with self.assertRaisesRegex(ValueError, "At least one training file"):
+                prepare_publication_split(validation_path, [], root / "split", selection_count=1)
+
 
 if __name__ == "__main__":
     unittest.main()

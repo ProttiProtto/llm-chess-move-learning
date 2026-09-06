@@ -397,7 +397,7 @@ Median output-token throughput at concurrency 256:
 
 At natural-prompt concurrency 256, NVFP4 reduced p95 end-to-end latency from 1.93s to 1.49s for E2B and from 3.20s to 2.46s for E4B.
 
-Gemma 3 270M did not benefit from quantization. Its serving path is small enough that kernel launch, scaling, scheduling, sampling, and other non-matmul work dominate.
+Gemma 3 270M did not benefit from quantization in this workload. Its serving path is small enough that kernel launch, scaling, scheduling, sampling, or other non-matmul work may limit the benefit; identifying the dominant cause would require targeted profiling.
 
 ![Parallelism summary](assets/parallelism_portfolio_summary.png)
 
@@ -456,7 +456,7 @@ At concurrency 256, NVFP4 delivered the highest E2B/E4B output-token throughput 
 
 E4B benefited more than E2B, while 270M did not benefit. Quantization accelerates tensor operations, not scheduler, tokenizer, sampling, or kernel-launch overhead.
 
-### 7. Check handling is the primary reasoning failure
+### 7. Check handling is the primary legal-move-enumeration failure
 
 The check/non-check gap indicates that the models often know how pieces move but fail to apply the global king-safety filter. This gives the project a concrete target for curriculum learning, verifier-guided decoding, or reinforcement learning.
 
@@ -466,7 +466,7 @@ Training loss declined smoothly, but checkpoint quality did not always peak at t
 
 ### 9. Benchmark correctness is part of model engineering
 
-The publication workflow corrected unnecessary post-EOT generation, post-EOT parsing, and selection/test overlap risks. Prompts, stopping, parsing, splits, and hashes are treated as part of the experiment contract.
+The publication workflow corrected unnecessary post-EOT generation, post-EOT parsing, and selection/test overlap risks. Checkpoint selection now uses the same EOT-aware parser as final scoring, and throughput results must match the exact quality-evaluated checkpoint hash. Prompts, stopping, parsing, splits, and hashes are treated as part of the experiment contract.
 
 ## Reproducing the Project
 
