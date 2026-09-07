@@ -7,6 +7,7 @@ This package contains the supported implementation for training and evaluating m
 | Notebook | Purpose |
 |---|---|
 | `SFT_All_Legal_Moves_Colab.ipynb` | Build the leakage-aware dataset and run resumable LoRA SFT with telemetry and intermediate checkpoints |
+| `Checkpoint_Selection_EOT_Comparison_Colab.ipynb` | Reevaluate existing LoRA checkpoints with the corrected EOT contract while loading each BF16 base model only once |
 | `VLLM_Checkpoint_Export_Colab.ipynb` | Merge a LoRA adapter into BF16 weights and export independent BF16, FP8, and NVFP4 checkpoints |
 | `VLLM_Publication_Evaluation_Colab.ipynb` | Run the corrected 27-variant held-out quality evaluation and preserve predictions, hashes, prompt audits, and metrics |
 | `VLLM_Parallelism_Benchmark_Colab.ipynb` | Benchmark real-FEN and fixed-length serving workloads across configured concurrency levels |
@@ -41,6 +42,7 @@ Hardware-specific PyTorch, TorchAO, vLLM, CUDA, and ModelOpt packages are delibe
 - `build_all_legal_moves_dataset.py` generates canonical alphabetically sorted legal-move targets with `python-chess`.
 - `train_sft_chunk.py` runs resumable LoRA SFT and records exact token, timing, memory, and configuration telemetry.
 - `evaluate_sft_checkpoints.py` evaluates intermediate checkpoints after training.
+- `compare_checkpoint_selections.py` performs resumable shared-base checkpoint reevaluation without loading deployment exports.
 - `publication_eval.py` owns the shared prompt, EOT truncation, parsing, split-audit, and metric contracts.
 - `run_publication_evaluation.py` and `offline_vllm_worker.py` run corrected batched quality evaluation.
 - `run_parallelism_benchmark.py` runs reproducible online vLLM throughput and latency scenarios.

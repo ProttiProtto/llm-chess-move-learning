@@ -14,11 +14,13 @@ Upload the generated `colab_drive_bundle` folder directly under `MyDrive` with t
 ```text
 MyDrive/colab_drive_bundle/
   SFT_All_Legal_Moves_Colab.ipynb
+  Checkpoint_Selection_EOT_Comparison_Colab.ipynb
   VLLM_Checkpoint_Export_Colab.ipynb
   VLLM_Publication_Evaluation_Colab.ipynb
   VLLM_Parallelism_Benchmark_Colab.ipynb
   train_sft_chunk.py
   evaluate_sft_checkpoints.py
+  compare_checkpoint_selections.py
   run_publication_evaluation.py
   run_parallelism_benchmark.py
   ...other bundled dependencies...

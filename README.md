@@ -521,6 +521,7 @@ Upload the resulting folder directly to `MyDrive/colab_drive_bundle/`.
 ```text
 MyDrive/colab_drive_bundle/
   SFT_All_Legal_Moves_Colab.ipynb
+  Checkpoint_Selection_EOT_Comparison_Colab.ipynb
   VLLM_Checkpoint_Export_Colab.ipynb
   VLLM_Publication_Evaluation_Colab.ipynb
   VLLM_Parallelism_Benchmark_Colab.ipynb
@@ -563,6 +564,10 @@ python -m fen_move_colab.train_sft_chunk \
 ```
 
 ### Evaluate checkpoints
+
+For existing completed runs, open `Checkpoint_Selection_EOT_Comparison_Colab.ipynb` and run all cells. It evaluates all six configured rank/model runs while loading each BF16 base family only once. It never loads merged, FP8, or NVFP4 exports, preserves the pre-fix report, writes a resumable corrected report, and lists only the runs whose selected checkpoint changed.
+
+For a single newly trained run, use the standard evaluator:
 
 ```bash
 python -m fen_move_colab.evaluate_sft_checkpoints \
