@@ -1,12 +1,13 @@
 # Artifact Publication Guide
 
-The Git repository contains source code, tests, notebooks, documentation, and derived plots. Large datasets, raw predictions, adapters, and merged checkpoints should be published separately with immutable version tags and SHA-256 hashes.
+The Git repository contains source code, tests, notebooks, documentation, 15 PNG/SVG figure pairs, and compact audited v2 evidence. Large datasets, raw predictions, adapters, and merged checkpoints should be published separately with immutable version tags and SHA-256 hashes.
 
 ## Publication Status
 
 | Artifact | Destination | Status |
 |---|---|---|
 | Source, tests, notebooks, and plots | [GitHub repository](https://github.com/ProttiProtto/llm-chess-move-learning) | Included |
+| Audited configurations, hashes, tables and report | [results/v2](results/v2/REPORT.md) | Included; figures can be redrawn without raw ZIPs |
 | Raw predictions and benchmark reports | [GitHub Releases](https://github.com/ProttiProtto/llm-chess-move-learning/releases) or a Hugging Face dataset | Publish with the results release |
 | Processed SFT, selection, and test splits | Hugging Face dataset | Publish after completing the dataset card and hash manifest |
 | LoRA adapters | Hugging Face model repositories | Publish after completing the model cards and license review |
@@ -58,5 +59,9 @@ The dataset card should include:
 ## Raw Results
 
 The results release should preserve the unmodified evaluator and benchmark output directories, including configurations, contracts, environment reports, split manifests, checkpoint manifests, raw predictions, repetition-level performance files, consolidated comparisons, and their SHA-256 hashes.
+
+The corrected publication sources are listed with exact filenames, sizes and SHA-256 hashes in [the v2 report](results/v2/REPORT.md#sources-and-reproduction). Publish those quality and parallelism ZIPs together with the six training-metrics ZIPs and executed checkpoint-selection notebook. The supplied quality ZIP does not include worker logs; do not claim that missing logs were archived. The selection table is recoverable from the executed notebook, but standalone corrected selection JSON files were not supplied here.
+
+The tracked `results/v2/evidence.json` and CSVs are sufficient to regenerate figures and the report. They are not replacements for raw predictions or the original dataset in an independent re-audit. External artifact uploads are still pending; the release destination link above is not a claim that those files have been uploaded.
 
 The plotting commands in [`analysis/README.md`](analysis/README.md) consume those raw outputs and regenerate the tracked README figures.

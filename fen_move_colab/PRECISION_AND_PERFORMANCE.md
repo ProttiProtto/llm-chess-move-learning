@@ -1,5 +1,7 @@
 # Precision and performance guide
 
+**Scope:** the published v2 experiments trained all six runs with BF16 base weights, then merged and post-training-quantized with the vLLM export notebook (compressed-tensors FP8_DYNAMIC and ModelOpt NVFP4 W4A4). The TorchAO FP8/QAT paths described below are optional implementations, not the source of the reported quantization results. Their convergence, speed, and compatibility with ModelOpt exports have not been established by this experiment matrix. See [the report](../results/v2/REPORT.md).
+
 ## FP8 training versus export
 
 The `fp8` training mode and FP8 deployment artifact are intentionally separate:
@@ -68,8 +70,9 @@ reconstructed_value = E2M1_value * FP8_block_scale * FP32_global_scale
 ```
 
 Fine-grained scaling gives NVFP4 more usable dynamic range than unscaled FP4.
-QAT exposes the LoRA update to the rounding error expected after conversion,
-which can recover accuracy lost by post-training quantization.
+QAT is intended to expose trainable updates to rounding error. Whether this
+particular path recovers accuracy after a merged ModelOpt export needs a
+separate, recipe-matched experiment; it is not demonstrated by the PTQ results.
 
 The current TorchAO QAT path does not execute training GEMMs on native NVFP4
 Tensor Cores, does not keep optimizer state in four bits, and should not be

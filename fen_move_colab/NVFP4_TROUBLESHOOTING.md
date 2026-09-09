@@ -1,46 +1,31 @@
 # NVFP4 Serving Notes
 
-## Pinned environment
+## Measured Configuration
 
-The vLLM notebook requires this serving combination for native Blackwell W4A4
-NVFP4 testing:
+The v2 experiments used NVIDIA RTX PRO 6000 Blackwell Server Edition (compute capability 12.0), PyTorch 2.13.0+cu132, vLLM 0.27.0, and Transformers 5.14.1. This documents the tested configuration, not a universal list of supported GPUs or future dependency versions.
 
-- GPU: NVIDIA Blackwell with compute capability 12.0 or newer.
-- PyTorch: 2.13.0 with CUDA 13.2.
-- vLLM: 0.27.0.
-- Transformers: 5.14.1.
-- CUDA JIT packages: all of `nvidia-cuda-cccl`, `nvidia-cuda-crt`,
-  `nvidia-cuda-nvcc`, `nvidia-cuda-nvrtc`, `nvidia-cuda-runtime`,
-  `nvidia-nvjitlink`, and `nvidia-nvvm` at 13.2.86.
+Cell 3 of the publication-quality and parallelism notebooks installs/verifies the serving stack and CUDA JIT components. Cell 4 runs the evaluation or benchmark; Cell 5 only displays saved results. Use a fresh runtime for serving rather than mixing it with the export environment.
 
-Cell 5 now reinstalls and verifies this full component set before any native
-NVFP4 model loads. It also makes unversioned CUDA library links available to
-the FlashInfer JIT linker.
+## Export and Backend
 
-## Expected native path
+The publication export is ModelOpt NVFP4 W4A4, not the optional weight-only NVFP4A16 route. Check the saved quantization metadata, including both weight and input-activation bit widths, excluded modules, scales, and export validation results.
 
-The notebook requests `flashinfer_cutlass` for dense NVFP4 linear layers and
-`flashinfer_b12x` for Gemma 4 MoE experts. This is W4A4 NVFP4, not the
-weight-only W4A16 fallback. The exported benchmark manifest must report:
+The serving configuration requests `flashinfer_cutlass` for dense linear layers. The separately configured `flashinfer_b12x` MoE option does not establish that these models executed MoE kernels. Backend flags and quantization metadata are evidence of configuration; only profiling could establish detailed kernel utilization.
 
-- `quantization_kind: nvfp4`
-- `native_nvfp4: true`
-- `native_nvfp4_w4a4: true`
-- `cuda13_toolkit_verified: true`
+## Failure Guide
 
-## Failure guide
+| Symptom | Check |
+| --- | --- |
+| CUDA compiler/header mismatch | Preserve the error and rerun the pinned serving setup in a fresh runtime; avoid mixing CUDA component versions. |
+| Missing B12x kernel for dense linears | Keep dense backend FlashInfer CUTLASS, not the MoE backend. |
+| Cannot find libcudart or libnvrtc | Inspect Cell 3's CUDA JIT/toolkit validation and library search paths. |
+| Failure after model loading | Save worker/server logs, checkpoint manifest, package versions and GPU details before changing the stack. |
+| Out of memory | Reduce context/concurrency and inspect KV reservation; changing settings invalidates a direct speed comparison. |
+| Poor outputs despite successful execution | Compare the same checkpoint family against BF16 on the same quality contract. Successful kernel execution does not guarantee acceptable quantization accuracy. |
+| Export destination already exists | The tested notebook may reuse it when overwrite is disabled. After checkpoint selection changes, use a fresh export name or back up the old folder before explicitly enabling overwrite. Inspect worker exit codes as well as saved manifests. |
 
-| Symptom | Likely cause | Action |
-| --- | --- | --- |
-| `CUDA compiler and CUDA toolkit headers are incompatible` | Mixed CUDA pip wheels, commonly 13.3 `nvcc` with 13.2 headers. | Restart the Colab runtime and rerun Cells 1-5 from the updated notebook. |
-| `no 'flashinfer_b12x' kernel exists for NVFP4 layers` | B12x was forced for dense linear layers. | Keep dense backend `flashinfer_cutlass`; reserve B12x for MoE. |
-| `cannot find -lcudart` or `-lnvrtc` | The JIT linker cannot resolve unversioned CUDA libraries. | Use the updated Cell 5, which creates a curated `LIBRARY_PATH`. |
-| Native kernel error after model load | A vLLM, FlashInfer, or CUDA 13 Blackwell kernel issue. | Preserve the manifest, `flashinfer show-config`, GPU details, and exact error before trying a newer pinned stack. |
-| Out of memory during vLLM startup | KV cache reservation is too large for the model and requested context/concurrency. | Reduce `VLLM_GPU_MEMORY_UTILIZATION`, `VLLM_MAX_MODEL_LEN`, or `VLLM_MAX_NUM_SEQS`. |
-| Correct-looking startup but poor outputs | A native FP4 kernel correctness or quantization regression. | Compare greedy outputs with BF16 on the identical held-out set before reporting throughput. |
+## Reporting
 
-## Reporting policy
+The [v2 report](../results/v2/REPORT.md) contains completed NVFP4 quality and speed results. NVFP4 was faster than BF16 for E2B/E4B at high tested concurrency, with a model-dependent accuracy cost; 270M did not gain useful speed in this workload.
 
-Treat BF16 and FP8 benchmark results as reportable after their held-out
-accuracy and speed files are saved. NVFP4 remains experimental until one
-native W4A4 benchmark completes and passes the same fixed-set quality checks.
+Retain the distinction between native W4A4 execution, calibration quality, and whole-model precision. Excluded components remain higher precision. Results do not establish that NVFP4 is universally faster or slower.

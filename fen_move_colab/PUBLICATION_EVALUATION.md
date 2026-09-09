@@ -1,6 +1,6 @@
-# Publication evaluation v1
+# Publication Evaluation
 
-This evaluator fixes the two correctness risks in the exploratory benchmark: it stops vLLM at Gemma's `<end_of_turn>` token and independently truncates saved text at the first marker before parsing UCI moves.
+This evaluator fixes the two correctness risks in the exploratory benchmark: it resolves model-specific end-of-turn markers (rejecting unknown-token IDs) and independently truncates saved text at the first marker before parsing UCI moves. Published v2 results are documented in [the report](../results/v2/REPORT.md).
 
 ```mermaid
 flowchart LR
@@ -23,7 +23,7 @@ Training and evaluation both call `make_all_legal_moves_instruction(fen)` and us
 
 ## Run in Colab
 
-Upload the updated `fen_move_colab` package into `MyDrive/colab_drive_bundle`, open `VLLM_Publication_Evaluation_Colab.ipynb`, and run its cells in order. The final cell executes:
+Upload the contents of `fen_move_colab` directly into `MyDrive/colab_drive_bundle`, alongside `runs`, `datasets`, and `vllm_exports`. A nested `fen_move_colab` folder on Drive is not required: the notebook creates the importable package on the local Colab disk. Open `VLLM_Publication_Evaluation_Colab.ipynb` and run its cells in order. Cell 4 executes the equivalent of:
 
 ```bash
 python -m fen_move_colab.run_publication_evaluation \
@@ -32,13 +32,15 @@ python -m fen_move_colab.run_publication_evaluation \
 
 The default config evaluates all 27 base/rank/precision combinations. It excludes the first 128 validation positions used for checkpoint selection, then verifies that the remaining 9,872 positions share neither canonical FENs nor source games with training.
 
+For this release, the quality notebook retains its Colab-tested `subprocess.check_call` launch behavior. Cell output may be quiet; progress remains inspectable in saved reports and worker logs. New logging and preflight conveniences are deferred. The v2 result paths are retained, and no additional GPU run is needed to publish the completed experiments.
+
 ## Saved evidence
 
 Every run stores the exact runtime config, dataset and split hashes, checkpoint file hashes, package versions, model/tokenizer provenance, stop strings and any trustworthy stop IDs, generation settings, raw predictions, worker logs, and corrected quality metrics. Quality tables include move-set F1, exact-position accuracy, and separate check/non-check results.
 
 Serving performance is a separate optional benchmark. It should use real FEN prompts with natural EOT stopping plus fixed input/output lengths, and report concurrency, requests/s, output tokens/s, TTFT, and end-to-end latency without blocking quality evaluation.
 
-Memory fields deliberately separate checkpoint weight bytes, vLLM model-loading memory, KV-cache reservation, CUDA-graph memory, and whole-GPU NVML peak. The latter must not be described as model size.
+Where available, memory fields separate checkpoint weight bytes, vLLM model-loading memory, KV-cache reservation, CUDA-graph memory, and whole-GPU NVML peak. The offline v2 archive does not contain every one of these fields. Do not infer missing breakdowns or describe whole-GPU peak as model size.
 
 ## Offline correction
 
@@ -61,4 +63,4 @@ The default experiment has one training seed. Report rank comparisons as observa
 - Lichess database exports are published under CC0; cite the source and snapshot date.
 - Gemma 3 and Gemma 4 may have different model terms. Preserve the exact model ID/revision and follow the license/model card that applies to each downloaded checkpoint or derivative.
 - Stockfish is GPLv3. If a binary is redistributed, satisfy the corresponding source and notice obligations.
-- This repository currently has no top-level code license. Choose and add one before a public release; do not imply that model or dataset terms are replaced by the code license.
+- The top-level MIT license covers original project code only; it does not replace model or dataset terms. See [ARTIFACTS.md](../ARTIFACTS.md) before distributing derived weights.

@@ -47,7 +47,14 @@ def configure_style() -> None:
 
 def add_header(figure: plt.Figure, title: str, subtitle: str) -> None:
     figure.suptitle(title, x=0.055, y=0.985, ha="left", fontsize=19, fontweight="bold", color="#203040")
-    figure.text(0.055, 0.948, subtitle, ha="left", va="top", fontsize=10.5, color="#59636B")
+    subtitle_y = 0.985 - 30 / (72 * figure.get_figheight())
+    figure.text(0.055, subtitle_y, subtitle, ha="left", va="top", fontsize=10.5, color="#59636B")
+
+
+def save_plot(figure: plt.Figure, path: Path) -> None:
+    for extension in ("png", "svg"):
+        metadata = {"Date": None} if extension == "svg" else None
+        figure.savefig(path.with_suffix(f".{extension}"), dpi=220, bbox_inches="tight", metadata=metadata)
 
 
 def plot_training_loss(history: pd.DataFrame, output_dir: Path) -> None:
@@ -64,7 +71,7 @@ def plot_training_loss(history: pd.DataFrame, output_dir: Path) -> None:
         axis.spines[["top", "right"]].set_visible(False)
         axis.legend()
     figure.tight_layout(rect=(0.04, 0.04, 0.99, 0.88), w_pad=2)
-    figure.savefig(output_dir / "training_loss_curves.png", dpi=220, bbox_inches="tight")
+    save_plot(figure, output_dir / "training_loss_curves.png")
     plt.close(figure)
 
 
@@ -95,7 +102,7 @@ def plot_training_cost(training: pd.DataFrame, output_dir: Path) -> None:
     axis.set_ylabel("Training-loop hours")
     axis.spines[["top", "right"]].set_visible(False)
     figure.tight_layout(rect=(0.04, 0.05, 0.99, 0.86))
-    figure.savefig(output_dir / "training_cost.png", dpi=220, bbox_inches="tight")
+    save_plot(figure, output_dir / "training_cost.png")
     plt.close(figure)
 
 
@@ -144,7 +151,7 @@ def plot_throughput_scaling(performance: pd.DataFrame, output_dir: Path) -> None
             if row == 0 and column == 2:
                 axis.legend(loc="upper left")
     figure.tight_layout(rect=(0.04, 0.04, 0.99, 0.91), h_pad=2, w_pad=1.5)
-    figure.savefig(output_dir / "throughput_scaling.png", dpi=220, bbox_inches="tight")
+    save_plot(figure, output_dir / "throughput_scaling.png")
     plt.close(figure)
 
 
@@ -152,7 +159,7 @@ def plot_parallelism_summary(performance: pd.DataFrame, output_dir: Path) -> Non
     figure, axes = plt.subplots(2, 2, figsize=(15.5, 10))
     add_header(
         figure,
-        "Parallel inference: portfolio summary",
+        "Parallel inference: throughput and latency",
         "Concurrency 256 throughput and tail latency plus NVFP4 request scaling.",
     )
     x = np.arange(len(SIZES))
@@ -200,7 +207,7 @@ def plot_parallelism_summary(performance: pd.DataFrame, output_dir: Path) -> Non
     axes[1, 1].set_title("Tail latency at concurrency 256")
     axes[1, 1].spines[["top", "right"]].set_visible(False)
     figure.tight_layout(rect=(0.045, 0.04, 0.99, 0.91), h_pad=2.8, w_pad=2.5)
-    figure.savefig(output_dir / "parallelism_portfolio_summary.png", dpi=220, bbox_inches="tight")
+    save_plot(figure, output_dir / "parallelism_portfolio_summary.png")
     plt.close(figure)
 
 
@@ -277,7 +284,7 @@ def plot_quality_throughput(joined: pd.DataFrame, mode: str, output_dir: Path) -
         else "quality_vs_throughput_fixed_128x128.png"
     )
     figure.tight_layout(rect=(0.04, 0.055, 0.99, 0.855), h_pad=2.1, w_pad=2)
-    figure.savefig(output_dir / filename, dpi=220, bbox_inches="tight")
+    save_plot(figure, output_dir / filename)
     plt.close(figure)
 
 

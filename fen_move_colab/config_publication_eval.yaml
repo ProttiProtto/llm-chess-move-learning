@@ -1,5 +1,5 @@
 run:
-  output_root: /content/drive/MyDrive/colab_drive_bundle/publication_evaluation_v1
+  output_root: /content/drive/MyDrive/colab_drive_bundle/publication_evaluation_v2
   local_model_cache: /content/publication_model
   copy_model_to_local_ssd: true
   # Restore the proven LLM.generate path for quality evaluation. Serving

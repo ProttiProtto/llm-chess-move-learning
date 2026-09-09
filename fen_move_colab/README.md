@@ -32,7 +32,7 @@ Upload `colab_drive_bundle/` directly under `MyDrive`. See `README_UPLOAD_TO_DRI
 - `requirements-colab.txt` installs training and dataset dependencies without replacing Colab's CUDA-matched PyTorch build.
 - `requirements-colab-fp8.txt` adds TorchAO for optional FP8 and low-precision training paths.
 - `requirements-publication-eval.txt` defines the CPU-side publication evaluator dependencies; the notebooks install the pinned vLLM/Torch/CUDA serving stack separately.
-- The repository-level `pyproject.toml` defines reproducible local and CI extras such as `.[test]`, `.[training]`, and `.[publication]`.
+- The repository-level `pyproject.toml` defines local and CI extras such as `.[test]`, `.[training]`, and `.[publication]`. These dependency ranges are not a GPU lockfile; use recorded environment versions when reproducing an experiment.
 
 Hardware-specific PyTorch, TorchAO, vLLM, CUDA, and ModelOpt packages are deliberately not folded into one universal environment. The notebooks pin those stacks where the target GPU and Colab image are known.
 

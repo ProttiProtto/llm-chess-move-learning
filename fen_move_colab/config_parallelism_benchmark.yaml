@@ -1,5 +1,5 @@
 run:
-  output_root: /content/drive/MyDrive/colab_drive_bundle/parallelism_benchmarks_v1
+  output_root: /content/drive/MyDrive/colab_drive_bundle/parallelism_benchmarks_v2
   local_model_cache: /content/parallelism_model
   copy_model_to_local_ssd: true
   resume: true
