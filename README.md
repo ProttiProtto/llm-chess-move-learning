@@ -30,12 +30,12 @@ The corrected v2 evaluation uses 9,872 held-out positions, excluding the 128-pos
 - **E4B-r32 BF16: 95.02% macro move-set F1, but 56.16% exact-position accuracy.** F1 measures overlap, not the percentage of fully correct positions.
 - **King safety is the clearest failure mode:** E4B-r32 BF16 scores 98.21% F1 outside check versus 28.36% in check, with only 2.44% in-check exact accuracy. Check positions are 4.57% of the test set but contribute 63.55% of its illegal extras.
 - **Rank 32 exceeded rank 16 in these single-seed BF16 runs** for all three model families. This is an observation, not a statistically established rank-scaling law.
-- **FP8 largely preserved fine-tuned quality.** E4B-r32 FP8 scores 94.99% F1 and 56.04% exact accuracy; at concurrency 256 it delivered 1.12x BF16 natural-FEN output-token throughput on the measured stack.
-- **NVFP4 trades accuracy for throughput differently across sizes.** E4B-r32 reaches 94.41% F1 and 47.57% exact accuracy at 1.39x BF16 natural-FEN throughput. For 270M, NVFP4 substantially reduces quality without a throughput benefit in this workload.
+- **FP8 largely preserved fine-tuned quality.** E4B-r32 FP8 scores 94.99% F1 and 56.04% exact accuracy. Historical natural-FEN throughput measurements are archived below rather than used as final deployment claims.
+- **NVFP4 trades accuracy for compression differently across sizes.** E4B-r32 reaches 94.41% F1 and 47.57% exact accuracy. For 270M, NVFP4 substantially reduces quality in this workload.
 
 ![Accuracy versus throughput, natural FEN workload](assets/quality_vs_throughput_natural_fen.png)
 
-These plots pair full-test quality with a separate concurrency-256 speed experiment on the **same checkpoint hashes**. They do not imply that every speed-test request was scored for accuracy.
+These plots pair full-test quality with a separate concurrency-256 speed experiment on the **same checkpoint hashes**. The natural-FEN speed measurements are retained as **archived/provisional evidence** because a release audit found that generation could continue after the first end-of-turn marker; they are not final interactive-serving claims. Fixed 128 x 128 results remain a synthetic length-controlled hardware comparison, not chess accuracy or interactive latency.
 
 ## Pipeline
 
@@ -149,9 +149,13 @@ Generation uses temperature 0, top-p 1, top-k -1, seed 20260820, and maximum 512
 
 Precision, recall, and F1 are averaged **per position**. Exact accuracy requires equality of the complete sets. Malformed tokens are tracked separately by the strict-format metric; they are not counted as valid moves. Illegal rate is micro-aggregated over unique valid predictions.
 
-Earlier evaluation had an EOT-handling defect. Corrected selection changed 270M-r16, 270M-r32, and E2B-r32 checkpoints; those exports and the final quality/speed experiments were rerun. **v2 supersedes previous final results.** Old/new selection scores use different contracts and are not an additional-training gain. The [historical selection table](results/v2/checkpoint_selection.csv) makes this correction visible.
+Earlier evaluation had an EOT-handling defect. Corrected selection changed 270M-r16, 270M-r32, and E2B-r32 checkpoints; those exports and the v2 quality/serving experiments were rerun. **v2 supersedes previous quality results.** A later release audit identified the natural-FEN timing limitation documented below, so v2 serving data are retained as archived evidence rather than final performance claims. Old/new selection scores use different contracts and are not an additional-training gain. The [historical selection table](results/v2/checkpoint_selection.csv) makes this correction visible.
 
-## Serving Results
+Some pre-v2 release-review notes cite a different set of first-EOT BF16 values. Those values refer to an earlier checkpoint/export matrix and must not replace the current table. The tracked v2 values are regenerated from the September 8 raw archive after EOT-aware checkpoint reselection and independent rescoring of all 266,544 saved completions. The archive identity and selected checkpoint hashes are recorded in the [v2 report](results/v2/REPORT.md#sources-and-reproduction).
+
+## Archived Serving Results
+
+**Release status:** the natural-FEN saturated benchmark is preserved for transparency but is **provisional and excluded from final production-throughput or interactive-latency claims**. A release audit determined that its timing could include generation after the first `<end_of_turn>` marker. Correct-stop performance requires a new benchmark run. The fixed 128 x 128 workload intentionally ignores EOS and remains useful only as a synthetic, fixed-length hardware comparison.
 
 Nine rank-32 exports were measured on one Blackwell GPU in **separate workloads**:
 
@@ -162,9 +166,9 @@ Both run at maximum concurrency **1, 8, 32, 128, 256**, with three repetitions a
 
 Scenario resume hashes are semantic: the transient server port is normalized while the actual launched command remains recorded for provenance. Restarting a benchmark on another free port therefore reuses only otherwise contract-identical completed scenarios.
 
-Below: concurrency 256, median of three repetitions. Quality is from the separate full test set.
+Below: concurrency 256, median of three repetitions. Quality is from the separate full test set. Natural columns are archived/provisional; fixed output throughput is a synthetic length-controlled measurement.
 
-| Rank-32 model | Format | F1 | Exact | Natural requests/s | Natural output tok/s | Fixed output tok/s |
+| Rank-32 model | Format | F1 | Exact | Natural requests/s (archived) | Natural output tok/s (archived) | Fixed output tok/s |
 | --- | --- | --- | --- | --- | --- | --- |
 | 270M | BF16 | 90.10% | 12.90% | 303.66 | 43,158 | 45,803 |
 | 270M | FP8 | 89.95% | 11.89% | 299.64 | 42,646 | 43,910 |
@@ -178,7 +182,7 @@ Below: concurrency 256, median of three repetitions. Quality is from the separat
 
 ![Throughput scaling](assets/throughput_scaling.png)
 
-All **270 scenarios / 110,592 measured requests** completed with zero request failures. The report includes p50/p95 time-to-first-token and end-to-end latency. Bands are observed min/max, **not confidence intervals**. Latency summaries are medians of repetition-level percentiles, not pooled-request percentiles.
+All **270 scenarios / 110,592 measured requests** completed with zero request failures. Completion alone does not make the natural-mode timings valid interactive latency: their p50/p95 time-to-first-token, end-to-end latency, requests/s, and output-tokens/s are archived pending a correct-stop rerun. Bands are observed min/max, **not confidence intervals**. Latency summaries are medians of repetition-level percentiles, not pooled-request percentiles.
 
 Measured stack: vLLM **0.27.0**, PyTorch **2.13.0+cu132**, Transformers **5.14.1**, compressed-tensors **0.17.0**, NVIDIA driver **580.82.07**. Settings: context 1,024, max_num_seqs=256, max_num_batched_tokens=16384, chunked prefill on, prefix caching off, GPU memory utilization 0.90. Per-run environments are in [evidence.json](results/v2/evidence.json).
 

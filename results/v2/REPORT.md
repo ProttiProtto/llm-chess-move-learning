@@ -65,6 +65,8 @@ Old and corrected selection scores use different evaluation contracts and someti
 
 The changed selections are 270M-r32 (8700), 270M-r16 (9000) and E2B-r32 (8400). Those adapters were merged and quantized again. The other three selected adapters stayed the same. This report supersedes earlier v1 final-quality and serving summaries. Revisiting a held-out set while repairing evaluation can influence later decisions; this is an iterative benchmark, not a claim of a never-inspected blind test.
 
+Some pre-v2 release-review notes cite a different set of first-EOT BF16 values. Those values describe an earlier checkpoint/export matrix and are not substituted into this report. The v2 values below are regenerated from the September 8 raw archive after EOT-aware checkpoint reselection and independent rescoring of all 266,544 saved completions. The source archive hash and selected checkpoint hashes are retained below so this distinction is auditable rather than resolved by manually replacing numbers.
+
 ## Deployment precision
 
 Every reported low-precision model starts from a BF16 LoRA merge, then undergoes post-training quantization. These results are not evidence of QLoRA, FP8 training or NVFP4 QAT performance. Optional training modes in the code are outside this experiment matrix.
@@ -154,17 +156,19 @@ For E4B-r32 BF16, check positions account for **63.55%** of illegal extras while
 
 All length-limited generations remain in the denominators. Results measure quality under a fixed 512-token budget, not unconstrained quality. Base models often produce prose/repetition or incomplete lists under the strict output contract; this is a limitation of the baseline protocol as well as an observed task-compliance gap. The diagnostic CSV also includes post-EOT text counts, missed moves, and raw-prediction hashes. Post-EOT marker observation can be normalized by the worker and should not be interpreted as an independent stopping-rate measurement; use recorded finish reasons for the cap diagnostic.
 
-## Serving experiment
+## Archived serving experiment
+
+**Release status:** natural-FEN throughput and latency are retained as **archived/provisional evidence**, not final production or interactive-serving measurements. A release audit determined that timing could include generation after the first `<end_of_turn>` marker. A correct-stop rerun is required before making deployment-speed claims from that workload. Fixed 128-input/128-output measurements intentionally ignore EOS and remain only a synthetic, length-controlled hardware comparison.
 
 Nine rank-32 exports were measured: three sizes times three precisions. Each ran natural FEN and fixed 128-input/128-output workloads at concurrency 1, 8, 32, 128 and 256, three repetitions each: 270 scenarios and **110,592 measured requests**, with zero failed requests. Each scenario also has 16 warmup requests, excluded from its measured request count. Request counts per repetition are 128, 128, 256, 512 and 1,024 respectively. Requests are not independent training seeds.
 
 `vllm bench serve` measures a local client calling the local server over HTTP with streaming. Maximum concurrency caps in-flight requests; it is not a fixed training microbatch. vLLM schedules continuous batches. The benchmark uses infinite offered request rate, no prefix caching, chunked prefill, `max_num_seqs=256`, `max_num_batched_tokens=16384`, maximum context 1,024 and GPU memory utilization 0.90. See the [vLLM benchmark guide](https://docs.vllm.ai/en/stable/benchmarking/cli/).
 
-Natural prompts use the held-out FEN prompt format and EOT stopping with a 512-token cap. Each concurrency level uses a subset of the same 9,872-position file, not the entire file; larger concurrency also changes sample count. Fixed-token scenarios ignore EOS and force 128 generated tokens, and all input/output lengths were verified in raw results. Fixed prompts are synthetic and their outputs have no chess-accuracy interpretation. Pairing full-test quality with fixed-token throughput compares two separate measurements of the same artifact.
+Natural prompts use the held-out FEN prompt format and requested EOT stopping with a 512-token cap, but the archived benchmark did not reliably terminate timing at the first marker. Each concurrency level uses a subset of the same 9,872-position file, not the entire file; larger concurrency also changes sample count. Fixed-token scenarios ignore EOS and force 128 generated tokens, and all input/output lengths were verified in raw results. Fixed prompts are synthetic and their outputs have no chess-accuracy interpretation. Pairing full-test quality with fixed-token throughput compares two separate measurements of the same artifact.
 
-Throughput is the median of three repetitions; bands are observed min/max, not confidence intervals. Latency cells are medians of three per-repetition p50/p95 values, not percentiles of pooled requests. Short fixed workloads have startup/steady-state effects and do not establish sustained production capacity. There is no WAN traffic, real-user arrival distribution or multi-GPU scaling experiment.
+Archived throughput is the median of three repetitions; bands are observed min/max, not confidence intervals. Natural-mode latency cells are also archived and must not be presented as interactive p50/p95 latency. Short fixed workloads have startup/steady-state effects and do not establish sustained production capacity. There is no WAN traffic, real-user arrival distribution or multi-GPU scaling experiment.
 
-### Concurrency 256
+### Concurrency 256 (natural columns archived)
 
 | Variant | Workload | Requests/s | Output tok/s | vs BF16 | p95 TTFT ms | p95 E2E ms |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -187,7 +191,7 @@ Throughput is the median of three repetitions; bands are observed min/max, not c
 | e4b-r32-fp8 | natural_fen | 108.97 | 15,591.38 | 1.12 | 229.33 | 2,972.25 |
 | e4b-r32-nvfp4 | natural_fen | 135.36 | 19,362.29 | 1.39 | 241.54 | 2,332.09 |
 
-Full repetition data and medians at every concurrency are provided as CSV. No repetition is silently removed as an outlier. Natural output-token throughput depends on how many tokens the model produces, so requests/s and latency should be read alongside it. Small differences between three repetitions should not be presented as statistically established gains.
+Full repetition data and medians at every concurrency are provided as CSV for auditability. No repetition is silently removed as an outlier. Natural-mode numbers are historical diagnostics only; no speedup ratio from them is a final claim. Small differences between three fixed-length repetitions should not be presented as statistically established gains.
 
 ### Environment and memory
 
@@ -199,7 +203,7 @@ The footprint chart reports full exported checkpoint-directory bytes (including 
 
 The report builder independently rescored all 266,544 saved completions against engine-generated legal moves, checked all aggregate metrics, test ordering and split hashes, checked all 270 raw scenario results for request completion and fixed lengths, and matched all nine serving checkpoint hashes to quality evidence. It checked the saved overlap audit; the original training dataset is a separate artifact. Unit tests cover invalid evidence rejection and parser contracts. CPU CI cannot establish GPU kernel correctness.
 
-No new training, generation or performance measurements were run during report production. The report does not establish causality for model size/rank, prove general chess reasoning, demonstrate production SLAs, or benchmark optional QAT/RAG/RL modules. More training seeds, a new blind challenge set, format-flexible base prompting, longer generation budgets, and profiling are future work.
+No new training, generation or performance measurements were run during report production. The report does not establish causality for model size/rank, prove general chess reasoning, demonstrate production SLAs, or benchmark optional QAT/RAG/RL modules. The archived natural-FEN timings require a correct-stop rerun before release as performance claims. More training seeds, a new blind challenge set, format-flexible base prompting, longer generation budgets, and profiling are future work.
 
 ### Release notebook behavior
 
