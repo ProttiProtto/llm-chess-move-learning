@@ -9,7 +9,19 @@ Can a small language model read a chess position and list **every legal move**, 
 
 This is a legal-move enumeration benchmark, **not a chess engine, Elo evaluation, or claim of reliable general chess reasoning**. The models produce strong move-set overlap after fine-tuning, but complete correctness and king safety remain substantial weaknesses.
 
-**Start here:** [Comprehensive v2 report and all figures](results/v2/REPORT.md) | [Rebuild the analysis](analysis/README.md) | [Artifact availability](ARTIFACTS.md)
+**Start here:** [Comprehensive v2 report and all figures](results/v2/REPORT.md) | [Dataset on Hugging Face](https://huggingface.co/datasets/ProttiProtto/lichess-fen-legal-moves) | [Model and adapter downloads](ARTIFACTS.md#hugging-face-repositories) | [Rebuild the analysis](analysis/README.md)
+
+## Models and Dataset
+
+The processed dataset, six selected LoRA adapters, and nine rank-32 serving checkpoints are staged in private Hugging Face repositories for final review. Their links will work for authorized reviewers now and for everyone after the repositories are made public. The [artifact catalog](ARTIFACTS.md#hugging-face-repositories) provides direct and immutable-revision links for every BF16, FP8, and NVFP4 checkpoint.
+
+```python
+from datasets import load_dataset
+
+dataset = load_dataset("ProttiProtto/lichess-fen-legal-moves")
+```
+
+The GitHub source, evaluation contracts, compact evidence, and report are versioned separately from large model artifacts. Making the Hugging Face repositories public is an explicit release step; this README does not imply that private artifacts are currently accessible without authorization.
 
 ## Main Findings
 
@@ -131,6 +143,8 @@ The gap is consistent with difficulty enforcing global king-safety constraints. 
 
 Training and evaluation share make_all_legal_moves_instruction(fen) and the same turn wrapper. Legacy one-move instructions in the validation file are **not used**: prompts are rebuilt from FEN and audited.
 
+Split preparation independently regenerates legal moves with `python-chess` for both the 128-position selection set and the 9,872-position test set, rejects duplicate canonical FENs within either partition, and checks both partitions against training FENs and source-game IDs. Checkpoint identity hashes include only explicit runtime model/tokenizer files, so adding a model card or publication manifest does not change model identity.
+
 Generation uses temperature 0, top-p 1, top-k -1, seed 20260820, and maximum 512 output tokens. Stop strings and verified token IDs are model-specific. The parser independently truncates at the first end-of-turn marker and deduplicates valid UCI moves.
 
 Precision, recall, and F1 are averaged **per position**. Exact accuracy requires equality of the complete sets. Malformed tokens are tracked separately by the strict-format metric; they are not counted as valid moves. Illegal rate is micro-aggregated over unique valid predictions.
@@ -145,6 +159,8 @@ Nine rank-32 exports were measured on one Blackwell GPU in **separate workloads*
 - **Fixed 128 x 128:** synthetic 128-token inputs and exactly 128 generated tokens, ignoring EOS. This controls sequence length; outputs are not scored as chess answers.
 
 Both run at maximum concurrency **1, 8, 32, 128, 256**, with three repetitions and 16 warmup requests per scenario. Concurrency means in-flight requests, **not a fixed batch size**: vLLM forms continuous batches. Measured requests per repetition are 128, 128, 256, 512, and 1,024, respectively.
+
+Scenario resume hashes are semantic: the transient server port is normalized while the actual launched command remains recorded for provenance. Restarting a benchmark on another free port therefore reuses only otherwise contract-identical completed scenarios.
 
 Below: concurrency 256, median of three repetitions. Quality is from the separate full test set.
 
@@ -242,7 +258,7 @@ General package dependency ranges are **not a GPU lockfile**. See [analysis inst
 | .github/workflows/evaluation-tests.yml | Lint and pytest on Python 3.11/3.12 |
 | ARTIFACTS.md | External artifact status, provenance and licensing checklist |
 
-Raw ZIPs, processed datasets, adapters, and models are **not included in Git**. External uploads are pending; see [ARTIFACTS.md](ARTIFACTS.md). No public model download is claimed before publication. Tracked evidence retains configurations, archive/checkpoint hashes, environments, diagnostics, and compact results. Full raw files remain necessary for an independent re-audit.
+Raw ZIPs, processed datasets, adapters, and models are **not included in Git**. The dataset, selected adapters, and rank-32 serving exports are staged on Hugging Face; see [ARTIFACTS.md](ARTIFACTS.md). They remain private until the coordinated public release. Tracked evidence retains configurations, archive/checkpoint hashes, environments, diagnostics, and compact results. The unpublished raw quality and performance archives remain necessary for an independent re-audit.
 
 CI checks contracts on CPU, not model quality or CUDA kernels. Local tests passing do not mean a remote GitHub Actions run has completed.
 
@@ -260,4 +276,4 @@ The engineering contribution is the **measurable pipeline and evidence trail**: 
 
 ## Licensing
 
-[MIT](LICENSE) covers original code, not Gemma models or derived weights. Follow each base-model card's terms before distributing adapters/exports. Credit the [Lichess database](https://database.lichess.org/) and retain provenance. See [ARTIFACTS.md](ARTIFACTS.md) for the release checklist and pending model/dataset cards.
+[MIT](LICENSE) covers original code, not Gemma models or derived weights. Follow each base-model card's terms before distributing adapters/exports. Credit the [Lichess database](https://database.lichess.org/) and retain provenance. See [ARTIFACTS.md](ARTIFACTS.md) for artifact links, immutable revisions, and the release checklist.

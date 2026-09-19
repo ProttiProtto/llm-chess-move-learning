@@ -377,6 +377,10 @@ def prepare_publication_split(
         )
     if selection_fens & test_fens or selection_games & test_games:
         raise ValueError("Checkpoint-selection and final-test partitions overlap.")
+    if len(selection_fens) != len(selection_rows):
+        raise ValueError(
+            "Checkpoint-selection partition contains duplicate canonical FENs."
+        )
     if len(test_fens) != len(test_rows):
         raise ValueError("Final test partition contains duplicate canonical FENs.")
 
@@ -418,8 +422,8 @@ def prepare_publication_split(
             "source-game leakage cannot be audited completely."
         )
 
-    # Verify every published target independently with python-chess.
-    for row in test_rows:
+    # Verify every selection and test target independently with python-chess.
+    for row in [*selection_rows, *test_rows]:
         verify_record_ground_truth(row)
 
     destination = Path(output_dir)
@@ -450,6 +454,8 @@ def prepare_publication_split(
         "training_rows_missing_source_game_id": 0,
         "ground_truth_engine": f"python-chess {chess.__version__}",
         "ground_truth_engine_verified": True,
+        "checkpoint_selection_ground_truth_verified": True,
+        "final_test_ground_truth_verified": True,
         **prompt_contract(),
     }
     write_json(destination / "split_manifest.json", manifest)
@@ -460,10 +466,32 @@ def checkpoint_content_manifest(path: os.PathLike[str] | str) -> Dict:
     root = Path(path)
     if not root.is_dir():
         raise FileNotFoundError(f"Checkpoint directory does not exist: {root}")
-    included_suffixes = {".safetensors", ".json", ".jinja", ".model"}
+    runtime_filenames = {
+        "added_tokens.json",
+        "chat_template.jinja",
+        "config.json",
+        "feature_extractor_config.json",
+        "generation_config.json",
+        "hf_quant_config.json",
+        "image_processor_config.json",
+        "merges.txt",
+        "model.safetensors.index.json",
+        "preprocessor_config.json",
+        "processor_config.json",
+        "quantization_config.json",
+        "quantize_config.json",
+        "sentencepiece.bpe.model",
+        "special_tokens_map.json",
+        "tokenizer.json",
+        "tokenizer.model",
+        "tokenizer_config.json",
+        "vocab.json",
+        "vocab.txt",
+    }
     files = sorted(
         file for file in root.rglob("*")
-        if file.is_file() and (file.suffix in included_suffixes or file.name == "tokenizer.json")
+        if file.is_file()
+        and (file.suffix == ".safetensors" or file.name in runtime_filenames)
     )
     entries = []
     aggregate = hashlib.sha256()
@@ -474,6 +502,7 @@ def checkpoint_content_manifest(path: os.PathLike[str] | str) -> Dict:
         entries.append({"path": relative, "size_bytes": size, "sha256": digest})
         aggregate.update(f"{relative}\0{size}\0{digest}\n".encode("utf-8"))
     return {
+        "checkpoint_manifest_contract": "runtime_files_v2",
         "checkpoint_path": str(root.resolve()),
         "checkpoint_size_bytes": sum(entry["size_bytes"] for entry in entries),
         "checkpoint_content_sha256": aggregate.hexdigest(),

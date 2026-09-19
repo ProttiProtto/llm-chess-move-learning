@@ -11,6 +11,7 @@ from fen_move_colab.publication_eval import (
     END_OF_TURN,
     aggregate_scores,
     audit_prompt_contract,
+    checkpoint_content_manifest,
     legal_moves_for_fen,
     parse_uci_moves,
     prepare_publication_split,
@@ -152,6 +153,63 @@ class PublicationEvaluationTests(unittest.TestCase):
             _write_jsonl(validation_path, validation)
             with self.assertRaisesRegex(ValueError, "At least one training file"):
                 prepare_publication_split(validation_path, [], root / "split", selection_count=1)
+
+    def test_split_rejects_duplicate_selection_fens(self):
+        duplicate = _record(START_FEN, "p1", "g1")
+        validation = [
+            _record(START_FEN, "p0", "g0"),
+            duplicate,
+            _record(_position_after("e2e4"), "p2", "g2"),
+        ]
+        training = [_record(_position_after("c2c4"), "train", "train-game")]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            validation_path = root / "validation.jsonl"
+            training_path = root / "training.jsonl"
+            _write_jsonl(validation_path, validation)
+            _write_jsonl(training_path, training)
+            with self.assertRaisesRegex(ValueError, "duplicate canonical FENs"):
+                prepare_publication_split(
+                    validation_path, [training_path], root / "split", selection_count=2
+                )
+
+    def test_split_verifies_selection_ground_truth(self):
+        invalid_selection = _record(START_FEN, "p0", "g0")
+        invalid_selection["legal_moves"] = invalid_selection["legal_moves"][:-1]
+        validation = [
+            invalid_selection,
+            _record(_position_after("e2e4"), "p1", "g1"),
+        ]
+        training = [_record(_position_after("c2c4"), "train", "train-game")]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            validation_path = root / "validation.jsonl"
+            training_path = root / "training.jsonl"
+            _write_jsonl(validation_path, validation)
+            _write_jsonl(training_path, training)
+            with self.assertRaisesRegex(ValueError, "Ground-truth mismatch"):
+                prepare_publication_split(
+                    validation_path, [training_path], root / "split", selection_count=1
+                )
+
+    def test_checkpoint_hash_ignores_publication_metadata(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "config.json").write_text('{"model_type":"demo"}', encoding="utf-8")
+            (root / "model.safetensors").write_bytes(b"weights")
+            original = checkpoint_content_manifest(root)
+            (root / "artifact_manifest.json").write_text(
+                '{"publication":"metadata"}', encoding="utf-8"
+            )
+            updated = checkpoint_content_manifest(root)
+            self.assertEqual(
+                original["checkpoint_content_sha256"],
+                updated["checkpoint_content_sha256"],
+            )
+            self.assertNotIn(
+                "artifact_manifest.json",
+                {entry["path"] for entry in updated["files"]},
+            )
 
 
 if __name__ == "__main__":

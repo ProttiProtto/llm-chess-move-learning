@@ -65,6 +65,18 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _scenario_contract_payload(contract: Mapping) -> Dict:
+    """Remove transient runtime port values from a scenario's resume identity."""
+    payload = json.loads(json.dumps(contract))
+    payload.get("server", {}).pop("port", None)
+    command = list(payload.get("command", []))
+    for index, token in enumerate(command[:-1]):
+        if token == "--port":
+            command[index + 1] = "<runtime-port>"
+    payload["command"] = command
+    return payload
+
+
 def _package_version(name: str) -> str | None:
     try:
         return metadata.version(name)
@@ -581,7 +593,7 @@ def _model_scenarios(
             "command": command,
         }
         contract_sha = hashlib.sha256(
-            json.dumps(contract, sort_keys=True).encode("utf-8")
+            json.dumps(_scenario_contract_payload(contract), sort_keys=True).encode("utf-8")
         ).hexdigest()
         previous = _load_json(manifest_path)
         reuse = False

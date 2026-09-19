@@ -2,6 +2,7 @@ from fen_move_colab.run_parallelism_benchmark import (
     _request_count,
     _scalar_result,
     _scenario_plan,
+    _scenario_contract_payload,
     _signature_config,
     _validate_quality_provenance,
     _validate_benchmark_result,
@@ -68,6 +69,21 @@ def test_parallelism_signature_ignores_transient_port():
     first = {"server": {"port": 12345, "host": "127.0.0.1"}, "run": {"resume": True}}
     second = {"server": {"port": 54321, "host": "127.0.0.1"}, "run": {"resume": True}}
     assert _signature_config(first) == _signature_config(second)
+
+
+def test_scenario_contract_ignores_port_but_preserves_actual_command():
+    first = {
+        "server": {"port": 12345, "host": "127.0.0.1"},
+        "command": ["vllm", "bench", "serve", "--port", "12345", "--seed", "7"],
+    }
+    second = {
+        "server": {"port": 54321, "host": "127.0.0.1"},
+        "command": ["vllm", "bench", "serve", "--port", "54321", "--seed", "7"],
+    }
+
+    assert _scenario_contract_payload(first) == _scenario_contract_payload(second)
+    assert first["command"][4] == "12345"
+    assert second["command"][4] == "54321"
 
 
 def test_quality_provenance_requires_exact_checkpoint_hash():
