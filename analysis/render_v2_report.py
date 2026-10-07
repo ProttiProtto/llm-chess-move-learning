@@ -13,7 +13,7 @@ import pandas as pd
 from analysis.build_readme_figures import (
     COLORS, MODEL_LABELS, SIZES, QUANTIZATIONS, configure_style, add_header, save_plot,
     plot_training_loss, plot_training_cost, plot_throughput_scaling, plot_parallelism_summary,
-    plot_quality_throughput,
+    plot_quality_throughput, add_natural_fen_timing_warning,
 )
 from analysis.results import parse_variant_name, load_performance_comparison, join_quality_throughput
 
@@ -144,6 +144,8 @@ def serving_plots(p, q, evidence, assets):
                 ax.set_xlabel('Concurrent requests')
                 ax.set_ylabel('Milliseconds (log scale)')
                 ax.legend(fontsize=8)
+        if mode == 'natural_fen':
+            add_natural_fen_timing_warning(fig)
         finish(fig, assets, f"latency_{mode}.png", .91)
     fig, axes = plt.subplots(2, 3, figsize=(16, 9))
     add_header(fig, "Completed request throughput", "Median across three repetitions; natural responses have variable output lengths.")
@@ -159,6 +161,7 @@ def serving_plots(p, q, evidence, assets):
             ax.set_xlabel('Concurrent requests')
             ax.set_ylabel('Requests/s')
             ax.legend(fontsize=8)
+    add_natural_fen_timing_warning(fig)
     finish(fig, assets, 'request_throughput.png', .91)
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 5.5))

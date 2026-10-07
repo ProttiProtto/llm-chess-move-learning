@@ -25,6 +25,7 @@ COLORS = {"bf16": "#34495E", "fp8": "#E76F51", "nvfp4": "#159D91"}
 QUANT_LABELS = {"bf16": "BF16", "fp8": "FP8", "nvfp4": "NVFP4"}
 SIZE_COLORS = {"270m": "#277DA1", "e2b": "#F8961E", "e4b": "#43AA8B"}
 MARKERS = {"bf16": "o", "fp8": "s", "nvfp4": "^"}
+NATURAL_FEN_TIMING_WARNING = "Archived/provisional: post-EOT generation may affect timing."
 
 
 def configure_style() -> None:
@@ -55,6 +56,15 @@ def save_plot(figure: plt.Figure, path: Path) -> None:
     for extension in ("png", "svg"):
         metadata = {"Date": None} if extension == "svg" else None
         figure.savefig(path.with_suffix(f".{extension}"), dpi=220, bbox_inches="tight", metadata=metadata)
+
+
+def add_natural_fen_timing_warning(figure: plt.Figure) -> None:
+    # Keep the caveat inside the exported image, even when shared without its caption.
+    figure.text(
+        0.055, -0.005, f"Natural-FEN timings | {NATURAL_FEN_TIMING_WARNING}", ha="left", va="top",
+        fontsize=11, fontweight="bold", color="#9A441F",
+        bbox={"facecolor": "#FFF0D8", "edgecolor": "#D4A369", "pad": 6},
+    )
 
 
 def plot_training_loss(history: pd.DataFrame, output_dir: Path) -> None:
@@ -151,6 +161,7 @@ def plot_throughput_scaling(performance: pd.DataFrame, output_dir: Path) -> None
             if row == 0 and column == 2:
                 axis.legend(loc="upper left")
     figure.tight_layout(rect=(0.04, 0.04, 0.99, 0.91), h_pad=2, w_pad=1.5)
+    add_natural_fen_timing_warning(figure)
     save_plot(figure, output_dir / "throughput_scaling.png")
     plt.close(figure)
 
@@ -165,7 +176,7 @@ def plot_parallelism_summary(performance: pd.DataFrame, output_dir: Path) -> Non
     x = np.arange(len(SIZES))
     width = 0.24
     for axis, mode, title in (
-        (axes[0, 0], "natural_fen", "Deployment workload at concurrency 256"),
+        (axes[0, 0], "natural_fen", "Archived natural-FEN workload at concurrency 256"),
         (axes[0, 1], "fixed_tokens", "Controlled 128/128 workload at concurrency 256"),
     ):
         frame = performance[(performance["mode"] == mode) & (performance["concurrency"] == 256)]
@@ -207,6 +218,7 @@ def plot_parallelism_summary(performance: pd.DataFrame, output_dir: Path) -> Non
     axes[1, 1].set_title("Tail latency at concurrency 256")
     axes[1, 1].spines[["top", "right"]].set_visible(False)
     figure.tight_layout(rect=(0.045, 0.04, 0.99, 0.91), h_pad=2.8, w_pad=2.5)
+    add_natural_fen_timing_warning(figure)
     save_plot(figure, output_dir / "parallelism_portfolio_summary.png")
     plt.close(figure)
 
@@ -226,7 +238,7 @@ def pareto_frontier(frame: pd.DataFrame, metric: str) -> pd.DataFrame:
 
 def plot_quality_throughput(joined: pd.DataFrame, mode: str, output_dir: Path) -> None:
     titles = {
-        "natural_fen": ("Quality-throughput frontier: real FEN workload", "Natural stopping, maximum 512 tokens"),
+        "natural_fen": ("Quality versus archived throughput: real FEN workload", "Requested EOT stopping, maximum 512 tokens"),
         "fixed_tokens": ("Quality-throughput frontier: controlled workload", "Exactly 128 input and output tokens"),
     }
     metrics = (
@@ -284,6 +296,8 @@ def plot_quality_throughput(joined: pd.DataFrame, mode: str, output_dir: Path) -
         else "quality_vs_throughput_fixed_128x128.png"
     )
     figure.tight_layout(rect=(0.04, 0.055, 0.99, 0.855), h_pad=2.1, w_pad=2)
+    if mode == "natural_fen":
+        add_natural_fen_timing_warning(figure)
     save_plot(figure, output_dir / filename)
     plt.close(figure)
 

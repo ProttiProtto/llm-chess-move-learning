@@ -33,9 +33,9 @@ The corrected v2 evaluation uses 9,872 held-out positions, excluding the 128-pos
 - **FP8 largely preserved fine-tuned quality.** E4B-r32 FP8 scores 94.99% F1 and 56.04% exact accuracy. Historical natural-FEN throughput measurements are archived below rather than used as final deployment claims.
 - **NVFP4 trades accuracy for compression differently across sizes.** E4B-r32 reaches 94.41% F1 and 47.57% exact accuracy. For 270M, NVFP4 substantially reduces quality in this workload.
 
-![Accuracy versus throughput, natural FEN workload](assets/quality_vs_throughput_natural_fen.png)
+![Quality by check status for the six BF16 fine-tuned models](assets/check_status.png)
 
-These plots pair full-test quality with a separate concurrency-256 speed experiment on the **same checkpoint hashes**. The natural-FEN speed measurements are retained as **archived/provisional evidence** because a release audit found that generation could continue after the first end-of-turn marker; they are not final interactive-serving claims. Fixed 128 x 128 results remain a synthetic length-controlled hardware comparison, not chess accuracy or interactive latency.
+The lead chart shows the quality gap between check and non-check positions, not a speed claim. In the report, quality-throughput plots pair full-test quality with a separate concurrency-256 speed experiment on the **same checkpoint hashes**. Every natural-FEN timing chart carries an **archived/provisional** warning inside the image because generation could continue after the first end-of-turn marker; these measurements are not final interactive-serving claims. Fixed 128 x 128 results remain a synthetic length-controlled hardware comparison, not chess accuracy or interactive latency.
 
 ## Pipeline
 
@@ -159,7 +159,7 @@ Some pre-v2 release-review notes cite a different set of first-EOT BF16 values. 
 
 Nine rank-32 exports were measured on one Blackwell GPU in **separate workloads**:
 
-- **Natural FEN:** held-out chess prompts, natural EOT stopping, maximum 512 generated tokens. Output length can differ by model.
+- **Natural FEN (archived/provisional):** held-out chess prompts, requested EOT stopping, maximum 512 generated tokens. Timing may include post-EOT generation, and output length can differ by model.
 - **Fixed 128 x 128:** synthetic 128-token inputs and exactly 128 generated tokens, ignoring EOS. This controls sequence length; outputs are not scored as chess answers.
 
 Both run at maximum concurrency **1, 8, 32, 128, 256**, with three repetitions and 16 warmup requests per scenario. Concurrency means in-flight requests, **not a fixed batch size**: vLLM forms continuous batches. Measured requests per repetition are 128, 128, 256, 512, and 1,024, respectively.
